@@ -1,7 +1,5 @@
 import express from 'express';
 import http from 'node:http';
-import { join } from 'node:path';
-import { readdirSync } from 'node:fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GameSession } from './session.js';
 import { loadQuestions } from './questions.js';
@@ -15,7 +13,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 const session = new GameSession();
-const questions = loadQuestions('week-09.json');
+const questions = loadQuestions();
 const connections = new Map<WebSocket, ConnectionInfo>();
 
 app.use((_req, res, next) => {
@@ -28,16 +26,17 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/questions/index.json', (_req, res) => {
-  const dir = join(__dirname, '..', '..', 'questions');
-  try {
-    const files = readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'index.json');
-    res.json(files);
-  } catch {
-    res.json([]);
-  }
+  res.json([...questions.keys()]);
 });
 
-app.use('/questions', express.static(join(__dirname, '..', '..', 'questions')));
+app.get('/questions/:filename', (req, res) => {
+  const file = questions.get(req.params.filename);
+  if (!file) {
+    res.status(404).json({ error: 'question file not found' });
+    return;
+  }
+  res.json([...file.values()]);
+});
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url ?? '/', `http://localhost`);

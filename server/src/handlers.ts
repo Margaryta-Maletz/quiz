@@ -20,7 +20,7 @@ export interface ConnectionInfo {
 interface HandlerCtx {
   session: GameSession;
   connections: Map<WebSocket, ConnectionInfo>;
-  questions: Map<string, Question>;
+  questions: Map<string, Map<string, Question>>;
 }
 
 function send(ws: WebSocket, msg: AnyServerMsg): void {
@@ -50,10 +50,15 @@ function rawToText(raw: RawData): string {
   return (raw as Buffer).toString('utf-8');
 }
 
+function displayAnswer(question: Question): string {
+  return question.type === 'multiple' ? question.answers.join(', ') : question.answers[0] ?? '';
+}
+
 function endQuestionAndBroadcast(hostWsOrNull: WebSocket | null, ctx: HandlerCtx): void {
   const { session, connections, questions } = ctx;
   const activeQ = session.activeQuestion;
-  const correctAnswer = activeQ ? (questions.get(activeQ.id)?.answers[0] ?? '') : '';
+  const question = activeQ ? questions.get(activeQ.questionFile)?.get(activeQ.id) : undefined;
+  const correctAnswer = question ? displayAnswer(question) : '';
   const results = session.endQuestion();
 
   if (hostWsOrNull) send(hostWsOrNull, { type: 'round_results', results });
@@ -96,7 +101,7 @@ function onStudentJoin(
       const record = session.students.get(studentId)!;
       send(ws, { type: 'welcome', studentId, reconnectToken: record.reconnectToken });
       if (session.activeQuestion) {
-        const q = questions.get(session.activeQuestion.id);
+        const q = questions.get(session.activeQuestion.questionFile)?.get(session.activeQuestion.id);
         if (q) {
           send(ws, {
             type: 'question_started',
@@ -149,15 +154,20 @@ function onHostAuth(
 }
 
 function onStartQuestion(
+  ws: WebSocket,
   msg: Extract<ClientToServerMsg, { type: 'start_question' }>,
   info: ConnectionInfo,
   ctx: HandlerCtx,
 ): void {
   if (info.role !== 'host') return;
   const { session, connections, questions } = ctx;
-  const q = questions.get(msg.questionId);
-  if (!q) return;
+  const q = questions.get(msg.questionFile)?.get(msg.questionId);
+  if (!q) {
+    send(ws, { type: 'question_error', action: 'start', questionFile: msg.questionFile, questionId: msg.questionId, reason: 'Вопрос или файл не найден на сервере' });
+    return;
+  }
   session.startQuestion(
+    msg.questionFile,
     msg.questionId,
     msg.timeoutSec,
     (remaining) => {
@@ -195,21 +205,25 @@ function onSubmitAnswer(
     send(ws, { type: 'answer_rejected', reason: 'no active question' });
     return;
   }
-  const q = questions.get(session.activeQuestion.id);
-  const qType = q?.type ?? 'input';
+  const q = questions.get(session.activeQuestion.questionFile)?.get(session.activeQuestion.id);
+  if (!q) {
+    send(ws, { type: 'answer_rejected', reason: 'active question not found' });
+    return;
+  }
+  const qType = q.type ?? 'input';
   let studentAnswer: string;
   let correctAnswers: string[];
 
   if (qType === 'multiple') {
     // student sends sorted comma-joined selected options
     studentAnswer = msg.answer;
-    correctAnswers = [[...(q?.answers ?? [])].sort((a, b) => a.localeCompare(b)).join(',')];
+    correctAnswers = [[...q.answers].sort((a, b) => a.localeCompare(b)).join(',')];
   } else if (qType === 'single') {
     studentAnswer = msg.answer;
-    correctAnswers = q?.answers ?? [];
+    correctAnswers = q.answers;
   } else {
     studentAnswer = normalize(msg.answer);
-    correctAnswers = (q?.answers ?? []).map(normalize);
+    correctAnswers = q.answers.map(normalize);
   }
 
   const status = session.submitAnswer(info.studentId, studentAnswer, correctAnswers);
@@ -276,13 +290,17 @@ function onChatToStudent(
 }
 
 function onPreviewQuestion(
+  ws: WebSocket,
   msg: Extract<ClientToServerMsg, { type: 'preview_question' }>,
   info: ConnectionInfo,
   ctx: HandlerCtx,
 ): void {
   if (info.role !== 'host') return;
-  const q = ctx.questions.get(msg.questionId);
-  if (!q) return;
+  const q = ctx.questions.get(msg.questionFile)?.get(msg.questionId);
+  if (!q) {
+    send(ws, { type: 'question_error', action: 'preview', questionFile: msg.questionFile, questionId: msg.questionId, reason: 'Вопрос или файл не найден на сервере' });
+    return;
+  }
   broadcastRole(ctx.connections, ['present'], {
     type: 'question_started',
     questionId: q.id,
@@ -295,7 +313,7 @@ function onPreviewQuestion(
   broadcastRole(ctx.connections, ['present'], {
     type: 'question_ended',
     questionId: q.id,
-    correctAnswer: q.answers[0],
+    correctAnswer: displayAnswer(q),
   });
 }
 
@@ -322,13 +340,13 @@ export function handleMessage(ws: WebSocket, raw: RawData, ctx: HandlerCtx): voi
   switch (msg.type) {
     case 'student_join':     return onStudentJoin(ws, msg, info, ctx);
     case 'host_auth':        return onHostAuth(ws, msg, info, ctx);
-    case 'start_question':   return onStartQuestion(msg, info, ctx);
+    case 'start_question':   return onStartQuestion(ws, msg, info, ctx);
     case 'submit_answer':    return onSubmitAnswer(ws, msg, info, ctx);
     case 'end_question':     return onEndQuestion(ws, info, ctx);
     case 'override_score':   return onOverrideScore(ws, msg, info, ctx);
     case 'chat_to_host':     return onChatToHost(msg, info, ctx);
     case 'chat_to_student':  return onChatToStudent(msg, info, ctx);
-    case 'preview_question': return onPreviewQuestion(msg, info, ctx);
+    case 'preview_question': return onPreviewQuestion(ws, msg, info, ctx);
     case 'reset_session':    return onResetSession(info, ctx);
   }
 }

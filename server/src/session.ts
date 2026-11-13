@@ -11,6 +11,7 @@ interface StudentRecord {
 
 interface ActiveQuestion {
   id: string;
+  questionFile: string;
   startedAt: number;
   timeoutSec: number;
 }
@@ -60,13 +61,14 @@ export class GameSession {
   }
 
   startQuestion(
+    questionFile: string,
     questionId: string,
     timeoutSec: number,
     onTick: (remaining: number) => void,
     onTimeout: () => void,
   ): void {
     this.clearTimer();
-    this.activeQuestion = { id: questionId, startedAt: Date.now(), timeoutSec };
+    this.activeQuestion = { id: questionId, questionFile, startedAt: Date.now(), timeoutSec };
     this.answers = new Map();
     let remaining = timeoutSec;
     this.tickTimer = setInterval(() => {

@@ -7,6 +7,11 @@ import { HOST } from '../labels.ts';
 type Phase      = 'auth' | 'ready';
 type FormSubmit = { preventDefault(): void };
 type InputChange = { currentTarget: { value: string } };
+type QuestionRef = { questionFile: string; questionId: string };
+
+export function questionKey(questionFile: string, questionId: string): string {
+  return JSON.stringify([questionFile, questionId]);
+}
 
 export interface Student {
   id: string;
@@ -28,6 +33,7 @@ export interface HostGameApi {
   phase: Phase;
   tokenInput: string;
   authError: string;
+  questionError: string;
   questionFiles: string[];
   questionFile: string;
   questions: Question[];
@@ -59,6 +65,7 @@ export function useHostGame(): HostGameApi {
   const [phase, setPhase]               = useState<Phase>('auth');
   const [tokenInput, setTokenInput]     = useState('');
   const [authError, setAuthError]       = useState('');
+  const [questionError, setQuestionError] = useState('');
   const [questionFiles, setQuestionFiles] = useState<string[]>([]);
   const [questionFile, setQuestionFile] = useState('');
   const [questions, setQuestions]       = useState<Question[]>([]);
@@ -72,21 +79,32 @@ export function useHostGame(): HostGameApi {
   const [chatStudentId, setChatStudentId] = useState('');
   const [unreadCount, setUnreadCount]   = useState(0);
 
-  const activeIdRef     = useRef('');
-  const endingIdRef     = useRef('');
+  const activeRef       = useRef<QuestionRef | null>(null);
+  const endingRef       = useRef<QuestionRef | null>(null);
   const studentCountRef = useRef(0);
+  const fileRequestRef  = useRef(0);
 
-  const updateActiveId = useCallback((id: string) => {
-    setActiveId(id);
-    activeIdRef.current = id;
+  const updateActive = useCallback((question: QuestionRef | null) => {
+    setActiveId(question?.questionId ?? '');
+    activeRef.current = question;
   }, []);
 
   const loadFile = useCallback((filename: string) => {
+    const request = ++fileRequestRef.current;
     setQuestionFile(filename);
-    fetch(apiUrl('/questions/' + filename))
-      .then(r => r.json() as Promise<Question[]>)
-      .then(qs => { setQuestions(qs); })
-      .catch(() => {});
+    setQuestions([]);
+    setQuestionError('');
+    fetch(apiUrl('/questions/' + encodeURIComponent(filename)))
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<Question[]>;
+      })
+      .then(qs => { if (request === fileRequestRef.current) setQuestions(qs); })
+      .catch((err: unknown) => {
+        if (request === fileRequestRef.current) {
+          setQuestionError(`Не удалось загрузить файл ${filename}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -96,9 +114,18 @@ export function useHostGame(): HostGameApi {
         setPhase('ready');
         setAuthError('');
         fetch(apiUrl('/questions/index.json'))
-          .then(r => r.json() as Promise<string[]>)
-          .then(files => { setQuestionFiles(files); loadFile(files[0] ?? 'week-09.json'); })
-          .catch(() => { loadFile('week-09.json'); });
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json() as Promise<string[]>;
+          })
+          .then(files => {
+            setQuestionFiles(files);
+            if (files.length > 0) loadFile(files[0]);
+            else setQuestionError('На сервере нет файлов с вопросами');
+          })
+          .catch((err: unknown) => {
+            setQuestionError(`Не удалось загрузить список файлов: ${err instanceof Error ? err.message : String(err)}`);
+          });
         break;
       case 'auth_failed':
         setTokenInput('');
@@ -116,31 +143,47 @@ export function useHostGame(): HostGameApi {
         break;
       }
       case 'student_answered': {
-        const qId = activeIdRef.current;
-        if (qId) {
+        const active = activeRef.current;
+        if (active) {
+          const key = questionKey(active.questionFile, active.questionId);
           setQuestionStats(prev => {
-            const cur = prev[qId] ?? { status: 'active' as const, answeredCount: 0, totalStudents: 0, correctCount: 0 };
-            return { ...prev, [qId]: { ...cur, answeredCount: cur.answeredCount + 1 } };
+            const cur = prev[key] ?? { status: 'active' as const, answeredCount: 0, totalStudents: 0, correctCount: 0 };
+            return { ...prev, [key]: { ...cur, answeredCount: cur.answeredCount + 1 } };
           });
         }
         break;
       }
       case 'round_results': {
-        const endedId = endingIdRef.current || activeIdRef.current;
-        endingIdRef.current = '';
-        if (activeIdRef.current === endedId) updateActiveId('');
-        if (endedId) {
+        const ended = endingRef.current ?? activeRef.current;
+        endingRef.current = null;
+        if (activeRef.current === ended) updateActive(null);
+        if (ended) {
+          const key = questionKey(ended.questionFile, ended.questionId);
           const results = lastMessage.results;
           const correct = results.filter((r: StudentRoundResult) => r.correct).length;
           setQuestionStats(prev => ({
             ...prev,
-            [endedId]: {
+            [key]: {
               status: 'ended',
               answeredCount: results.length,
               totalStudents: studentCountRef.current,
               correctCount: correct,
             },
           }));
+        }
+        break;
+      }
+      case 'question_error': {
+        setQuestionError(`${lastMessage.reason}: ${lastMessage.questionFile} / ${lastMessage.questionId}`);
+        if (lastMessage.action === 'start') {
+          const key = questionKey(lastMessage.questionFile, lastMessage.questionId);
+          setQuestionStats(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+          const active = activeRef.current;
+          if (active && questionKey(active.questionFile, active.questionId) === key) updateActive(null);
         }
         break;
       }
@@ -160,7 +203,7 @@ export function useHostGame(): HostGameApi {
         break;
       }
     }
-  }, [lastMessage, loadFile, updateActiveId]);
+  }, [lastMessage, loadFile, updateActive]);
 
   const handleAuth = useCallback((e: FormSubmit) => {
     e.preventDefault();
@@ -172,39 +215,41 @@ export function useHostGame(): HostGameApi {
   const handleFileChange    = useCallback((e: InputChange) => { loadFile(e.currentTarget.value); }, [loadFile]);
 
   const handleCardClick = useCallback((questionId: string) => {
-    const stat = questionStats[questionId];
+    const key = questionKey(questionFile, questionId);
+    const stat = questionStats[key];
+    setQuestionError('');
 
     if (stat?.status === 'ended') {
-      send({ type: 'preview_question', questionId });
+      send({ type: 'preview_question', questionFile, questionId });
       return;
     }
 
     if (stat?.status === 'active') {
-      endingIdRef.current = questionId;
-      updateActiveId('');
+      endingRef.current = activeRef.current;
+      updateActive(null);
       send({ type: 'end_question', questionId });
       return;
     }
 
     // idle → start (possibly ending current active first)
-    const currentActive = activeIdRef.current;
+    const currentActive = activeRef.current;
     if (currentActive) {
-      endingIdRef.current = currentActive;
-      send({ type: 'end_question', questionId: currentActive });
+      endingRef.current = currentActive;
+      send({ type: 'end_question', questionId: currentActive.questionId });
     }
 
-    updateActiveId(questionId);
+    updateActive({ questionFile, questionId });
     setQuestionStats(prev => ({
       ...prev,
-      [questionId]: {
+      [key]: {
         status: 'active',
         answeredCount: 0,
         totalStudents: studentCountRef.current,
         correctCount: 0,
       },
     }));
-    send({ type: 'start_question', questionId, timeoutSec });
-  }, [questionStats, timeoutSec, send, updateActiveId]);
+    send({ type: 'start_question', questionFile, questionId, timeoutSec });
+  }, [questionFile, questionStats, timeoutSec, send, updateActive]);
 
   const handleReset = useCallback(() => {
     send({ type: 'reset_session' });
@@ -213,8 +258,9 @@ export function useHostGame(): HostGameApi {
     studentCountRef.current = 0;
     setScores([]);
     setQuestionStats({});
-    updateActiveId('');
-  }, [send, updateActiveId]);
+    endingRef.current = null;
+    updateActive(null);
+  }, [send, updateActive]);
 
   const handleOverride = useCallback((studentId: string, correct: boolean) => () => {
     send({ type: 'override_score', studentId, correct });
@@ -238,7 +284,7 @@ export function useHostGame(): HostGameApi {
   }, [send, chatStudentId]);
 
   return {
-    phase, tokenInput, authError, questionFiles, questionFile,
+    phase, tokenInput, authError, questionError, questionFiles, questionFile,
     questions, timeoutSec, activeId,
     students, studentCount, questionStats, scores,
     hostChats, chatStudentId, unreadCount, status, reconnected,

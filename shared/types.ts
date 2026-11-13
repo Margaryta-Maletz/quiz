@@ -47,6 +47,7 @@ export interface HostAuthMsg {
 
 export interface StartQuestionMsg {
   type: 'start_question';
+  questionFile: string;
   questionId: string;
   timeoutSec: number;
 }
@@ -70,6 +71,7 @@ export interface ChatToStudentMsg {
 
 export interface PreviewQuestionMsg {
   type: 'preview_question';
+  questionFile: string;
   questionId: string;
 }
 
@@ -197,6 +199,14 @@ export interface ChatFromStudentMsg {
   text: string;
 }
 
+export interface QuestionErrorMsg {
+  type: 'question_error';
+  action: 'start' | 'preview';
+  questionFile: string;
+  questionId: string;
+  reason: string;
+}
+
 export type ServerToHostMsg =
   | AuthSuccessMsg
   | AuthFailedMsg
@@ -204,7 +214,8 @@ export type ServerToHostMsg =
   | StudentAnsweredMsg
   | RoundResultsMsg
   | ScoreboardUpdateMsg
-  | ChatFromStudentMsg;
+  | ChatFromStudentMsg
+  | QuestionErrorMsg;
 
 // ── Server → Present ──────────────────────────────────────────────────────────
 

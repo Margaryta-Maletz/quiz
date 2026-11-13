@@ -1,6 +1,6 @@
 import Scoreboard from '../components/Scoreboard.tsx';
 import Chat from '../components/Chat.tsx';
-import { useHostGame } from '../hooks/useHostGame.ts';
+import { questionKey, useHostGame } from '../hooks/useHostGame.ts';
 import type { QuestionStat } from '../hooks/useHostGame.ts';
 import { HOST, LABELS } from '../labels.ts';
 
@@ -36,7 +36,7 @@ export default function HostPage() {
     : null;
 
   const cards = g.questions.map(q => {
-    const stat = g.questionStats[q.id];
+    const stat = g.questionStats[questionKey(g.questionFile, q.id)];
     const st = stat?.status ?? 'idle';
 
     let statsEl = null;
@@ -58,7 +58,7 @@ export default function HostPage() {
         <pre className="q-card-code">{q.code}</pre>
         {q.comment && <span className="q-card-comment">{q.comment}</span>}
         <div className="q-card-footer">
-          <span className="q-card-answer">{q.answers[0]}</span>
+          <span className="q-card-answer">{q.type === 'multiple' ? q.answers.join(', ') : q.answers[0]}</span>
           {statsEl}
         </div>
       </button>
@@ -87,6 +87,7 @@ export default function HostPage() {
               <input type="number" value={g.timeoutSec} min={10} max={300} onChange={g.handleTimeoutChange} />
             </label>
           </div>
+          {g.questionError && <p className="error">{g.questionError}</p>}
           <div className="question-cards">{cards}</div>
           <Scoreboard scores={g.scores} />
         </div>
