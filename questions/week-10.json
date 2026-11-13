@@ -1,0 +1,272 @@
+[
+  {
+    "id": "w10-01",
+    "code": "console.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nconsole.log('end');",
+    "type": "input",
+    "answers": [
+      "start end timeout"
+    ],
+    "comment": "Колбэк setTimeout помещается в очередь макрозадач. Стек вызовов должен полностью очиститься, прежде чем Event Loop возьмёт следующую макрозадачу."
+  },
+  {
+    "id": "w10-02",
+    "code": "console.log('1');\nsetTimeout(() => {\n  console.log('2');\n  setTimeout(() => console.log('3'), 0);\n  console.log('4');\n}, 0);\nconsole.log('5');",
+    "type": "input",
+    "answers": [
+      "1 5 2 4 3"
+    ],
+    "comment": "Внешний таймер — первая макрозадача: выводит 2, планирует ещё одну, выводит 4. Вложенный таймер — вторая макрозадача: 3."
+  },
+  {
+    "id": "w10-03",
+    "code": "setTimeout(() => console.log('a'), 100);\nsetTimeout(() => console.log('b'), 0);\nsetTimeout(() => console.log('c'), 50);\nconsole.log('d');",
+    "type": "input",
+    "answers": [
+      "d b c a"
+    ],
+    "comment": "Синхронный код — первым. Таймеры выполняются в порядке задержки: 0 мс → 50 мс → 100 мс."
+  },
+  {
+    "id": "w10-04",
+    "code": "for (var i = 0; i < 3; i++) {\n  setTimeout(() => console.log(i), 0);\n}",
+    "type": "input",
+    "answers": [
+      "3 3 3"
+    ],
+    "comment": "var — функциональная область видимости, все три колбэка захватывают одну и ту же переменную i. К моменту выполнения таймеров цикл завершён, i === 3. С let (блочная область) вывелось бы 0 1 2."
+  },
+  {
+    "id": "w10-05",
+    "code": "console.log('1');\nPromise.resolve().then(() => console.log('2'));\nsetTimeout(() => console.log('3'), 0);\nconsole.log('4');",
+    "type": "input",
+    "answers": [
+      "1 4 2 3"
+    ],
+    "comment": "Порядок: синхронный код → очередь микрозадач → очередь макрозадач. Promise.then — микрозадача, setTimeout — макрозадача."
+  },
+  {
+    "id": "w10-06",
+    "code": "console.log('start');\nPromise.resolve()\n  .then(() => console.log('micro 1'))\n  .then(() => console.log('micro 2'));\nsetTimeout(() => console.log('macro'), 0);\nPromise.resolve().then(() => console.log('micro 3'));\nconsole.log('end');",
+    "type": "input",
+    "answers": [
+      "start end micro 1 micro 3 micro 2 macro"
+    ],
+    "comment": "После синхронного кода в очереди: [micro 1, micro 3]. Запуск micro 1 добавляет micro 2 в конец → [micro 3, micro 2]. Только после полного опустошения очереди микрозадач запускается macro."
+  },
+  {
+    "id": "w10-07",
+    "code": "setTimeout(() => console.log('timeout'), 0);\nqueueMicrotask(() => console.log('microtask'));\nconsole.log('sync');",
+    "type": "input",
+    "answers": [
+      "sync microtask timeout"
+    ],
+    "comment": "queueMicrotask — явная постановка в очередь микрозадач. Как и Promise.then, выполняется до следующей макрозадачи."
+  },
+  {
+    "id": "w10-08",
+    "code": "Promise.resolve(1)\n  .then(x => x + 1)\n  .then(x => x * 2)\n  .then(console.log);",
+    "type": "input",
+    "answers": [
+      "4"
+    ],
+    "comment": "Цепочка .then: каждый обработчик получает возвращённое значение предыдущего. 1 → 2 → 4."
+  },
+  {
+    "id": "w10-09",
+    "code": "Promise.resolve('a')\n  .then(x => Promise.resolve(x + 'b'))\n  .then(x => x + 'c')\n  .then(console.log);",
+    "type": "input",
+    "answers": [
+      "abc"
+    ],
+    "comment": "Если .then возвращает Promise, следующий обработчик получает разрешённое значение этого Promise, а не сам объект Promise."
+  },
+  {
+    "id": "w10-10",
+    "code": "Promise.reject('oops')\n  .then(x => console.log('then:', x))\n  .catch(e => console.log('catch:', e));",
+    "type": "input",
+    "answers": [
+      "catch: oops"
+    ],
+    "comment": ".then пропускается при отклонённом Promise — управление передаётся к ближайшему .catch."
+  },
+  {
+    "id": "w10-11",
+    "code": "Promise.reject('error')\n  .catch(e => 'recovered: ' + e)\n  .then(x => console.log(x));",
+    "type": "input",
+    "answers": [
+      "recovered: error"
+    ],
+    "comment": ".catch возвращает новый разрешённый Promise (если не бросает исключение). Цепочка продолжается: следующий .then получает возвращённое из .catch значение."
+  },
+  {
+    "id": "w10-12",
+    "code": "console.log('1');\nnew Promise((resolve) => {\n  console.log('2');\n  resolve('done');\n  console.log('3');\n}).then(x => console.log(x));\nconsole.log('4');",
+    "type": "input",
+    "answers": [
+      "1 2 3 4 done"
+    ],
+    "comment": "Функция-экзекутор new Promise(fn) выполняется синхронно. resolve() лишь помечает Promise как выполненный — обработчик .then ставится в очередь микрозадач позже."
+  },
+  {
+    "id": "w10-13",
+    "code": "async function greet() {\n  return 'hello';\n}\nconst result = greet();\nconsole.log(result instanceof Promise);\nresult.then(console.log);",
+    "type": "input",
+    "answers": [
+      "true hello"
+    ],
+    "comment": "async-функция всегда возвращает Promise. return 'hello' — сахар над Promise.resolve('hello')."
+  },
+  {
+    "id": "w10-14",
+    "code": "async function run() {\n  console.log('a');\n  const x = await Promise.resolve('b');\n  console.log(x);\n  console.log('c');\n}\nconsole.log('start');\nrun();\nconsole.log('end');",
+    "type": "input",
+    "answers": [
+      "start a end b c"
+    ],
+    "comment": "await приостанавливает только текущую async-функцию, не весь поток. Управление возвращается к вызывающему коду, а продолжение после await ставится в очередь микрозадач."
+  },
+  {
+    "id": "w10-15",
+    "code": "async function load() {\n  console.log('loading');\n  const data = await Promise.resolve(42);\n  console.log('data:', data);\n  return data;\n}\nconsole.log('before');\nload().then(v => console.log('result:', v));\nconsole.log('after');",
+    "type": "input",
+    "answers": [
+      "before loading after data: 42 result: 42"
+    ],
+    "comment": "load() запускается синхронно до await. После await — микрозадача. .then на возвращённом Promise — ещё одна микрозадача после завершения load."
+  },
+  {
+    "id": "w10-16",
+    "code": "async function run() {\n  console.log('start');\n  await null;\n  console.log('after await');\n}\nrun();\nconsole.log('sync after run()');",
+    "type": "input",
+    "answers": [
+      "start sync after run() after await"
+    ],
+    "comment": "await null эквивалентен await Promise.resolve(null) — приостанавливает функцию, даже если значение уже известно."
+  },
+  {
+    "id": "w10-17",
+    "code": "async function run() {\n  const a = await Promise.resolve(1);\n  const b = await Promise.resolve(2);\n  const c = await Promise.resolve(3);\n  console.log(a + b + c);\n}\nrun();\nconsole.log('sync');",
+    "type": "input",
+    "answers": [
+      "sync 6"
+    ],
+    "comment": "Каждый await — отдельная микрозадача. Синхронный код после run() выполнится раньше, чем функция доберётся до console.log."
+  },
+  {
+    "id": "w10-18",
+    "code": "async function risky() {\n  throw new Error('boom');\n}\nasync function run() {\n  try {\n    await risky();\n    console.log('ok');\n  } catch (e) {\n    console.log('caught:', e.message);\n  }\n}\nrun();",
+    "type": "input",
+    "answers": [
+      "caught: boom"
+    ],
+    "comment": "throw внутри async-функции превращается в отклонённый Promise. try/catch с await перехватывает его."
+  },
+  {
+    "id": "w10-19",
+    "code": "async function run() {\n  const result = await Promise.reject('fail').catch(e => 'fallback');\n  console.log(result);\n}\nrun();",
+    "type": "input",
+    "answers": [
+      "fallback"
+    ],
+    "comment": ".catch перехватывает отклонение и возвращает 'fallback' — получается разрешённый Promise. await разворачивает его в строку."
+  },
+  {
+    "id": "w10-20",
+    "code": "Promise.resolve('ok')\n  .then(x => { throw new Error('oops'); })\n  .then(x => console.log('never'))\n  .catch(e => console.log('error:', e.message));",
+    "type": "input",
+    "answers": [
+      "error: oops"
+    ],
+    "comment": "Исключение внутри .then отклоняет возвращаемый Promise. Следующий .then пропускается, управление прыгает к .catch."
+  },
+  {
+    "id": "w10-21",
+    "code": "async function run() {\n  try {\n    const x = await Promise.resolve(10);\n    console.log('got:', x);\n    await Promise.reject(new Error('bad'));\n    console.log('unreachable');\n  } catch (e) {\n    console.log('error:', e.message);\n  }\n  console.log('done');\n}\nrun();",
+    "type": "input",
+    "answers": [
+      "got: 10 error: bad done"
+    ],
+    "comment": "try/catch оборачивает несколько await. Первый — успешный. Второй — бросает в catch. console.log('done') — после блока try/catch, выполняется всегда."
+  },
+  {
+    "id": "w10-22",
+    "code": "async function run() {\n  try {\n    await Promise.reject('error');\n  } catch (e) {\n    console.log('caught');\n    return 'from catch';\n  } finally {\n    console.log('finally');\n  }\n}\nrun().then(v => console.log('result:', v));",
+    "type": "input",
+    "answers": [
+      "caught finally result: from catch"
+    ],
+    "comment": "finally выполняется всегда — и при успехе, и при ошибке, и при return из catch. return в catch не отменяет finally, но и не перезаписывается им (значение 'from catch' сохраняется)."
+  },
+  {
+    "id": "w10-23",
+    "code": "Promise.all([\n  new Promise(r => setTimeout(() => r('slow'), 100)),\n  Promise.resolve('fast'),\n]).then(([a, b]) => console.log(a, b));",
+    "type": "input",
+    "answers": [
+      "slow fast"
+    ],
+    "comment": "Promise.all ждёт все Promise и возвращает массив в порядке входного массива, независимо от порядка выполнения."
+  },
+  {
+    "id": "w10-24",
+    "code": "Promise.all([\n  Promise.resolve(1),\n  Promise.reject('error'),\n  Promise.resolve(3),\n])\n  .then(r => console.log('ok:', r))\n  .catch(e => console.log('fail:', e));",
+    "type": "input",
+    "answers": [
+      "fail: error"
+    ],
+    "comment": "Promise.all завершается с ошибкой, как только любой Promise отклонён. Остальные результаты игнорируются."
+  },
+  {
+    "id": "w10-25",
+    "code": "Promise.race([\n  new Promise(r => setTimeout(() => r('slow'), 100)),\n  new Promise(r => setTimeout(() => r('fast'), 10)),\n  Promise.reject('immediate'),\n])\n  .then(v => console.log('won:', v))\n  .catch(e => console.log('rejected:', e));",
+    "type": "input",
+    "answers": [
+      "rejected: immediate"
+    ],
+    "comment": "Promise.reject('immediate') уже отклонён в момент создания — выигрывает гонку. Promise.race разрешается/отклоняется по первому завершившемуся Promise, будь то успех или ошибка."
+  },
+  {
+    "id": "w10-26",
+    "code": "Promise.allSettled([\n  Promise.resolve('ok'),\n  Promise.reject('fail'),\n  Promise.resolve('also ok'),\n]).then(results => {\n  console.log(results.length);\n  console.log(results[1].status, results[1].reason);\n});",
+    "type": "input",
+    "answers": [
+      "3 rejected fail"
+    ],
+    "comment": "Promise.allSettled никогда не отклоняется — ждёт все Promise и возвращает массив объектов { status: 'fulfilled'|'rejected', value|reason }."
+  },
+  {
+    "id": "w10-27",
+    "code": "Promise.any([\n  Promise.reject('e1'),\n  Promise.resolve('winner'),\n  Promise.reject('e2'),\n])\n  .then(v => console.log(v))\n  .catch(() => console.log('all failed'));",
+    "type": "input",
+    "answers": [
+      "winner"
+    ],
+    "comment": "Promise.any разрешается первым успешным Promise, игнорируя отклонения. Отклоняется только если все Promise отклонены (тогда AggregateError)."
+  },
+  {
+    "id": "w10-28",
+    "code": "console.log('1');\nsetTimeout(() => console.log('2'), 0);\nPromise.resolve().then(() => {\n  console.log('3');\n  setTimeout(() => console.log('4'), 0);\n});\nconsole.log('5');",
+    "type": "input",
+    "answers": [
+      "1 5 3 2 4"
+    ],
+    "comment": "Синхронно: 1, 5. Микрозадача: 3 + добавляет в очередь второй таймер. Макрозадача №1: 2. Макрозадача №2: 4."
+  },
+  {
+    "id": "w10-29",
+    "code": "async function foo() {\n  console.log('foo: start');\n  await Promise.resolve();\n  console.log('foo: end');\n}\nasync function bar() {\n  console.log('bar: start');\n  await Promise.resolve();\n  console.log('bar: end');\n}\nconsole.log('before');\nfoo();\nbar();\nconsole.log('after');",
+    "type": "input",
+    "answers": [
+      "before foo: start bar: start after foo: end bar: end"
+    ],
+    "comment": "foo и bar запускаются синхронно по очереди, каждая доходит до await и приостанавливается. После синхронного кода микрозадачи выполняются в порядке постановки в очередь."
+  },
+  {
+    "id": "w10-30",
+    "code": "Promise.resolve()\n  .then(() => console.log('micro 1'))\n  .then(() => console.log('micro 2'))\n  .then(() => console.log('micro 3'));\n\nsetTimeout(() => console.log('macro'), 0);",
+    "type": "input",
+    "answers": [
+      "micro 1 micro 2 micro 3 macro"
+    ],
+    "comment": "Ключевое: очередь микрозадач опустошается полностью перед тем, как Event Loop берёт следующую макрозадачу. Каждый .then добавляет новую микрозадачу — они все выполняются до setTimeout."
+  }
+]

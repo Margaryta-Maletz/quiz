@@ -1,0 +1,275 @@
+[
+  {
+    "id": "w10-async-01",
+    "code": "const promise = new Promise((resolve, reject) => {\n  console.log(1);\n  resolve();\n}).then(() => console.log(2));\n\nsetTimeout(() => console.log(3));\n\npromise.then(() => console.log(4));",
+    "type": "single",
+    "options": ["1 2 4 3", "1 2 3 4", "1 3 2 4", "2 1 4 3"],
+    "answers": ["1 2 4 3"],
+    "comment": "Экзекутор Promise выполняется синхронно и выводит 1. Обработчики then выполняются как микрозадачи: сначала 2, затем 4. Таймер выводит 3 после опустошения очереди микрозадач."
+  },
+  {
+    "id": "w10-async-02",
+    "code": "const p1 = new Promise(function (resolve, reject) {\n  resolve();\n});\n\nconst p2 = new Promise(function (resolve, reject) {\n  console.log(\"1\");\n  resolve();\n});\n\np1.then(() => {\n  console.log(\"2\");\n}).finally(() => {\n  console.log(\"3\");\n});\n\np2.then(function () {\n  console.log(\"4\");\n});",
+    "type": "single",
+    "options": ["1 2 4 3", "1 2 3 4", "1 4 2 3", "2 4 3 1"],
+    "answers": ["1 2 4 3"],
+    "comment": "Экзекутор p2 синхронно выводит 1. Обработчики then уже разрешённых промисов ставятся в очередь микрозадач: сначала 2, затем 4. Обработчик finally ставится в очередь после выполнения первого then и выводит 3 последним."
+  },
+  {
+    "id": "w10-async-03",
+    "code": "new Promise((r) => {\n  console.log(\"g1\");\n  r();\n}).then(() => console.log(\"g2\"));\n\nnew Promise((r) => {\n  console.log(\"g1a\");\n  r();\n}).then(() => console.log(\"g2a\"));",
+    "type": "single",
+    "options": ["g1 g1a g2 g2a", "g1 g2 g1a g2a", "g1 g1a g2a g2", "g2 g2a g1 g1a"],
+    "answers": ["g1 g1a g2 g2a"],
+    "comment": "Экзекуторы обоих промисов выполняются синхронно и выводят g1 и g1a. Затем обработчики then выполняются как микрозадачи в порядке постановки в очередь: g2 и g2a."
+  },
+  {
+    "id": "w10-async-04",
+    "code": "Promise.resolve().then(() => setTimeout(() => console.log(1), 0));\n\nsetTimeout(() => console.log(2), 0);\n\nconsole.log(3);",
+    "type": "input",
+    "answers": ["3 2 1"],
+    "comment": "Сначала синхронно выводится 3. Микрозадача then регистрирует таймер для 1 после того, как уже зарегистрирован таймер для 2, поэтому таймеры выводят 2 и 1."
+  },
+  {
+    "id": "w10-async-05",
+    "code": "new Promise(() => console.log(1));\n\nnew Promise((res) => {\n  console.log(2);\n  res(3);\n}).then((val) => console.log(val));\n\nnew Promise(() => setTimeout(() => console.log(4)));\n\nnew Promise(() => new Promise(() => console.log(5)));\nnew Promise(() => new Promise((res) => res(6)).then((val) => console.log(val)));",
+    "type": "input",
+    "answers": ["1 2 5 3 6 4"],
+    "comment": "Экзекуторы промисов, включая вложенные, выполняются синхронно и выводят 1, 2 и 5. Затем обработчики then выводят 3 и 6 в порядке постановки в очередь микрозадач. Таймер выводит 4 последним."
+  },
+  {
+    "id": "w10-async-06",
+    "code": "console.log(1);\nsetTimeout(() => console.log(2), 0);\nPromise.resolve().then(() => console.log(3));\nPromise.resolve().then(() => setTimeout(() => console.log(4), 0));",
+    "type": "input",
+    "answers": ["1 3 2 4"],
+    "comment": "Сначала синхронно выводится 1. Микрозадачи выводят 3 и регистрируют таймер для 4. Таймер для 2 был зарегистрирован раньше, поэтому он выполняется первым."
+  },
+  {
+    "id": "w10-async-07",
+    "code": "setTimeout(function () {\n  console.log(\"1\");\n  Promise.resolve().then(function () {\n    console.log(\"2\");\n  });\n}, 0);\n\nPromise.resolve().then(function () {\n  console.log(\"3\");\n  setTimeout(function () {\n    console.log(\"4\");\n  }, 0);\n});",
+    "type": "input",
+    "answers": ["3 1 2 4"],
+    "comment": "Сначала микрозадача выводит 3 и регистрирует второй таймер. Первый таймер выводит 1 и ставит микрозадачу для 2; она выполняется до второго таймера, который выводит 4."
+  },
+  {
+    "id": "w10-async-08",
+    "code": "async function test() {\n  const num = 4;\n  const var1 = await Promise.resolve();\n  const var2 = await num;\n  return \"qwer\";\n}\n\ntest().then((value) => console.log(value, value === \"qwer\"));",
+    "type": "single",
+    "options": ["qwer true", "qwer false", "undefined false", "4 false"],
+    "answers": ["qwer true"],
+    "comment": "await принимает как промисы, так и обычные значения. Возвращённая строка становится значением промиса async-функции, поэтому обработчик then получает qwer и сравнение даёт true."
+  },
+  {
+    "id": "w10-async-09",
+    "code": "const promise = Promise.resolve();\n\nsetTimeout(() => console.log(\"two\"), 0);\n\npromise.then(() => console.log(\"three\"));\n\n(async () => {\n  console.log(\"four\");\n  await promise;\n  console.log(\"five\");\n})();",
+    "type": "single",
+    "options": ["four three five two", "four three two five", "four five three two", "two three four five"],
+    "answers": ["four three five two"],
+    "comment": "Async-функция синхронно выводит four до await. Затем в порядке постановки выполняются микрозадачи: обработчик then выводит three, продолжение async-функции — five. Таймер выводит two последним."
+  },
+  {
+    "id": "w10-async-10",
+    "code": "const p = new Promise((resolve) => {\n  console.log(4);\n  setTimeout(() => {\n    console.log(7);\n    resolve();\n  }, 0);\n});\n\np.then(() => console.log(5));\nconsole.log(6);",
+    "type": "input",
+    "answers": ["4 6 7 5"],
+    "comment": "Экзекутор промиса синхронно выводит 4, затем основной код выводит 6. Таймер выводит 7 и разрешает промис; после завершения таймера микрозадача then выводит 5."
+  },
+  {
+    "id": "w10-async-11",
+    "code": "console.log(\"run\");\n\nsetTimeout(function timeout() {\n  console.log(\"timeout\");\n}, 0);\n\nconst p = new Promise(function (resolve, reject) {\n  console.log(\"create promise\");\n  resolve();\n});\n\np.then(function () {\n  console.log(\"resolve promise\");\n});\n\nconsole.log(\"finish\");",
+    "type": "single",
+    "options": ["run create promise finish resolve promise timeout", "run create promise resolve promise finish timeout", "run create promise finish timeout resolve promise", "run timeout create promise resolve promise finish"],
+    "answers": ["run create promise finish resolve promise timeout"],
+    "comment": "Синхронно выводятся run, create promise и finish. Затем микрозадача then выводит resolve promise, а после неё таймер выводит timeout."
+  },
+  {
+    "id": "w10-async-12",
+    "code": "new Promise((r) => {\n  console.log(\"g1\");\n  r();\n})\n  .then(() => console.log(\"g2\")) // micro 1\n  .then(() => console.log(\"g3\"))\n  .then(() => console.log(\"g4\"));\n\nnew Promise((r) => {\n  console.log(\"g1a\");\n  r();\n})\n  .then(() => console.log(\"g2a\"))\n  .then(() => console.log(\"g3a\"))\n  .then(() => console.log(\"g4a\"));\n\nnew Promise((r) => {\n  console.log(\"g1b\");\n  r();\n})\n  .then(() => console.log(\"g2b\"))\n  .then(() => console.log(\"g3b\"))\n  .then(() => console.log(\"g4b\"));\n\nnew Promise((r) => {\n  console.log(\"g1c\");\n  r();\n})\n  .then(() => console.log(\"g2c\"))\n  .then(() => console.log(\"g3c\"))\n  .then(() => console.log(\"g4c\"));",
+    "type": "single",
+    "options": [
+      "g1 g1a g1b g1c g2 g2a g2b g2c g3 g3a g3b g3c g4 g4a g4b g4c",
+      "g1 g2 g3 g4 g1a g2a g3a g4a g1b g2b g3b g4b g1c g2c g3c g4c",
+      "g1 g1a g1b g1c g2 g3 g4 g2a g3a g4a g2b g3b g4b g2c g3c g4c",
+      "g1 g1a g1b g1c g2c g2b g2a g2 g3c g3b g3a g3 g4c g4b g4a g4"
+    ],
+    "answers": ["g1 g1a g1b g1c g2 g2a g2b g2c g3 g3a g3b g3c g4 g4a g4b g4c"],
+    "comment": "Экзекуторы четырёх промисов синхронно выводят g1, g1a, g1b и g1c. Первые обработчики then уже стоят в очереди микрозадач. Каждый из них добавляет следующий обработчик своей цепочки в конец очереди, поэтому цепочки выполняются поочерёдно."
+  },
+  {
+    "id": "w10-async-13",
+    "code": "setTimeout(function timeout() {\n  console.log(\"1\");\n}, 0);\n\nconst p1 = new Promise(function (resolve, reject) {\n  console.log(\"2\");\n  resolve();\n});\n\nconst p2 = new Promise(function (resolve, reject) {\n  console.log(\"3\");\n  resolve();\n});\n\np1.then(() => {\n  console.log(\"4\");\n})\n  .then(() => {\n    console.log(\"5\");\n  })\n  .finally(() => {\n    console.log(\"6\");\n  });\n\np2.then(function () {\n  console.log(\"7\");\n});\n\nconsole.log(\"8\");",
+    "type": "input",
+    "answers": ["2 3 8 4 7 5 6 1"],
+    "comment": "Синхронно выводятся 2, 3 и 8. Первые обработчики then промисов p1 и p2 выводят 4 и 7; следующий then и finally цепочки p1 выводят 5 и 6. После опустошения очереди микрозадач таймер выводит 1."
+  },
+  {
+    "id": "w10-async-14",
+    "code": "console.log(1);\n\nsetTimeout(() => console.log(2));\n\nconsole.log(3);\n\nconst promise = new Promise((resolve, reject) => {\n  console.log(4);\n  resolve();\n})\n  .then(() => console.log(5))\n  .then(() => console.log(6));\n\nsetTimeout(() => console.log(7));\n\nconsole.log(8);\n\npromise.then(() => console.log(9)).then(() => console.log(10));\npromise.then(() => console.log(11)).then(() => console.log(12));",
+    "type": "single",
+    "options": [
+      "1 3 4 8 5 6 9 11 10 12 2 7",
+      "1 3 4 8 5 6 9 10 11 12 2 7",
+      "1 3 4 5 6 8 9 11 10 12 2 7",
+      "1 3 4 8 2 7 5 6 9 11 10 12"
+    ],
+    "answers": ["1 3 4 8 5 6 9 11 10 12 2 7"],
+    "comment": "Синхронно выводятся 1, 3, 4 и 8. Затем цепочка промисов выводит 5 и 6. Оба обработчика, подписанные на promise, выводят 9 и 11, после чего следующие обработчики выводят 10 и 12. Таймеры выводят 2 и 7 после микрозадач."
+  },
+  {
+    "id": "w10-async-15",
+    "code": "console.log(1);\nsetTimeout(() => console.log(2), 0);\nPromise.resolve().then(() => console.log(3));\nPromise.resolve().then(() => setTimeout(() => console.log(4), 0));\nPromise.resolve().then(() => console.log(5));\nsetTimeout(() => console.log(6), 0);\nconsole.log(7);\nPromise.resolve().then(() => console.log(8));\nPromise.resolve().then(() => setTimeout(() => console.log(9), 0));\nconsole.log(10);",
+    "type": "single",
+    "options": [
+      "1 7 10 3 5 8 2 6 4 9",
+      "1 7 10 3 5 8 2 4 6 9",
+      "1 3 5 7 8 10 2 6 4 9",
+      "1 7 10 2 6 3 5 8 4 9"
+    ],
+    "answers": ["1 7 10 3 5 8 2 6 4 9"],
+    "comment": "Синхронно выводятся 1, 7 и 10. Микрозадачи выводят 3, 5 и 8 и регистрируют таймеры для 4 и 9. Таймеры для 2 и 6 были зарегистрированы раньше, поэтому выводят свои значения первыми."
+  },
+  {
+    "id": "w10-async-16",
+    "code": "try {\n  setTimeout(function () {\n    console.log(\"before error\");\n    throw new Error(\"error\");\n    console.log(\"after error\");\n  }, 1000);\n} catch (e) {\n  console.log(\"catch\");\n}",
+    "type": "single",
+    "options": [
+      "before error; неперехваченная ошибка error",
+      "before error catch",
+      "before error after error catch",
+      "catch"
+    ],
+    "answers": ["before error; неперехваченная ошибка error"],
+    "comment": "Колбэк таймера выполняется после завершения блока try, поэтому внешний catch не перехватывает ошибку. После before error возникает неперехваченная ошибка; after error и catch не выводятся."
+  },
+  {
+    "id": "w10-async-17",
+    "code": "new Promise(() => console.log(1));\n\nnew Promise(() => console.log(2)).then(() => console.log(3));\n\nnew Promise(() => setTimeout(() => console.log(4)));\n\nnew Promise(() => setTimeout(() => console.log(5), 1000));\n\nnew Promise(() => new Promise(() => console.log(6)));\n\nnew Promise(() => new Promise(() => console.log(7))).then(() => console.log(8));\n\nnew Promise(() => new Promise(() => setTimeout(() => console.log(9))));\n\nnew Promise(() => new Promise(() => setTimeout(() => console.log(10), 1000)));",
+    "type": "single",
+    "options": [
+      "1 2 6 7 4 9 5 10",
+      "1 2 3 6 7 8 4 9 5 10",
+      "1 2 6 7 4 5 9 10",
+      "1 2 6 7 4 9 10 5"
+    ],
+    "answers": ["1 2 6 7 4 9 5 10"],
+    "comment": "Экзекуторы промисов синхронно выводят 1, 2, 6 и 7 и регистрируют таймеры. Промисы с обработчиками then не разрешаются: возвращаемые значения экзекуторов игнорируются, поэтому 3 и 8 не выводятся. Таймеры с нулевой задержкой выводят 4 и 9, затем таймеры с задержкой 1000 мс — 5 и 10."
+  },
+  {
+    "id": "w10-async-18",
+    "code": "console.log(\"start\");\n\nconst promise1 = Promise.resolve().then(() => {\n  console.log(\"promise1\");\n  const timer1 = setTimeout(() => {\n    console.log(\"timer1\");\n    const promise2 = Promise.resolve().then(() => {\n      console.log(\"promise2\");\n      const timer2 = setTimeout(() => {\n        console.log(\"timer2\");\n      }, 0);\n    });\n  }, 0);\n});\n\nconst timer3 = setTimeout(() => {\n  console.log(\"timer3\");\n  const promise3 = new Promise((resolve) => {\n    setTimeout(() => {\n      console.log(\"promise3\");\n      resolve();\n    }, 0);\n  }).then(() => {\n    console.log(\"promise3 then\");\n  });\n}, 0);\n\nasync function asyncFunction() {\n  console.log(\"async start\");\n  await new Promise((resolve) => setTimeout(resolve, 0));\n  console.log(\"async middle\");\n  await Promise.resolve().then(() => console.log(\"async promise\"));\n  console.log(\"async end\");\n}\n\nasyncFunction();\n\nconsole.log(\"end\");",
+    "type": "single",
+    "options": [
+      "start async start end promise1 timer3 async middle async promise async end timer1 promise2 promise3 promise3 then timer2",
+      "start async start end promise1 timer1 promise2 timer3 async middle async promise async end promise3 promise3 then timer2",
+      "start async start end promise1 timer3 async middle async promise async end timer1 promise2 timer2 promise3 promise3 then",
+      "start async start promise1 end timer3 async middle async promise async end timer1 promise2 promise3 promise3 then timer2"
+    ],
+    "answers": ["start async start end promise1 timer3 async middle async promise async end timer1 promise2 promise3 promise3 then timer2"],
+    "comment": "Синхронно выводятся start, async start и end, затем микрозадача promise1 регистрирует timer1. Ранее зарегистрированные timer3 и таймер внутри asyncFunction выполняются первыми; после последнего выполняются микрозадачи продолжения asyncFunction. Затем timer1 выводит timer1 и promise2. Таймер promise3 был зарегистрирован до timer2, а его then выполняется сразу после разрешения промиса."
+  },
+  {
+    "id": "w10-async-19",
+    "code": "console.log(\"Start\"); //\n\nsetTimeout(() => {\n  console.log(\"Timeout\"); //\n}, 1000);\n\nfetch(\"https://666189d163e6a0189fea5e34.mockapi.io/dolls\") //\n  .then((response) => response.json())\n  .then((data) => {\n    console.log(\"Fetch\", data[0].id); //\n  });\n\nPromise.resolve().then(() => {\n  console.log(\"Promise\"); //\n});\n\nconsole.log(\"End\"); //",
+    "type": "multiple",
+    "options": [
+      "Start End Promise Fetch <id> Timeout",
+      "Start End Promise Timeout Fetch <id>",
+      "Start End Promise Timeout (Fetch не выводится из-за ошибки)",
+      "Start Promise End Fetch <id> Timeout"
+    ],
+    "answers": [
+      "Start End Promise Fetch <id> Timeout",
+      "Start End Promise Timeout Fetch <id>",
+      "Start End Promise Timeout (Fetch не выводится из-за ошибки)"
+    ],
+    "comment": "Start и End выводятся синхронно, затем выполняется микрозадача Promise. Порядок Timeout и Fetch зависит от времени сетевого запроса и обработки ответа; <id> обозначает data[0].id. При ошибке запроса, разбора JSON или доступа к data[0].id Fetch не выводится, а промис отклоняется без обработчика ошибки."
+  },
+  {
+    "id": "w10-async-20",
+    "code": "const ar = [1, 2, 3, 4, 5];\nPromise.all(\n  ar.map((it) => {\n    return new Promise((res) => {\n      console.log(\"prom\" + it);\n      res(it);\n    });\n  })\n).then((r) => {\n  console.log(\"r\", r);\n});\n\nconst a2 = async () => {\n  for (let i = 0; i < ar.length; i++) {\n    await new Promise((res) => {\n      console.log(\"async\" + ar[i]);\n      res(ar[i]);\n    });\n  }\n};\na2();",
+    "type": "single",
+    "options": [
+      "prom1 prom2 prom3 prom4 prom5 async1 async2 r [1, 2, 3, 4, 5] async3 async4 async5",
+      "prom1 prom2 prom3 prom4 prom5 r [1, 2, 3, 4, 5] async1 async2 async3 async4 async5",
+      "prom1 prom2 prom3 prom4 prom5 async1 r [1, 2, 3, 4, 5] async2 async3 async4 async5",
+      "prom1 prom2 prom3 prom4 prom5 async1 async2 async3 async4 async5 r [1, 2, 3, 4, 5]"
+    ],
+    "answers": ["prom1 prom2 prom3 prom4 prom5 async1 async2 r [1, 2, 3, 4, 5] async3 async4 async5"],
+    "comment": "Экзекуторы промисов в map синхронно выводят prom1–prom5, затем a2 выводит async1 и приостанавливается. Микрозадачи Promise.all обрабатывают выполненные промисы, после чего первый await продолжает цикл и выводит async2. Затем обработчик Promise.all выводит массив, а следующие продолжения цикла выводят async3–async5."
+  },
+  {
+    "id": "w10-async-21",
+    "code": "const promise = Promise.resolve();\nconsole.log(\"one\");\n\nsetTimeout(() => console.log(\"two\"), 0);\npromise.then(() => console.log(\"three\"));\n\n(async () => {\n  console.log(\"four\");\n  await promise;\n  console.log(\"five\");\n})();\n\nconsole.log(\"six\");\n\nwindow.requestAnimationFrame(() => console.log('seven'));",
+    "type": "multiple",
+    "options": [
+      "one four six three five two seven",
+      "one four six three five seven two",
+      "one four six three five two (seven не выводится)",
+      "one four three five six two seven"
+    ],
+    "answers": [
+      "one four six three five two seven",
+      "one four six three five seven two",
+      "one four six three five two (seven не выводится)"
+    ],
+    "comment": "В браузере синхронно выводятся one, four и six, затем микрозадачи выводят three и five. Порядок таймера и requestAnimationFrame зависит от момента отрисовки. Например, в фоновой вкладке отрисовка может быть приостановлена, поэтому seven может не выводиться."
+  },
+  {
+    "id": "w10-async-22",
+    "code": "console.log(\"1\");\n\nsetTimeout(function () {\n  console.log(\"2\");\n  Promise.resolve().then(function () {\n    console.log(\"3\");\n  });\n}, 0);\n\nPromise.resolve().then(function () {\n  console.log(\"4\");\n  setTimeout(function () {\n    console.log(\"5\");\n  }, 0);\n});\n\nrequestAnimationFrame(function () {\n  console.log(\"7\");\n});\n\nconsole.log(\"6\");",
+    "type": "multiple",
+    "options": [
+      "1 6 4 7 2 3 5",
+      "1 6 4 2 3 7 5",
+      "1 6 4 2 3 5 7",
+      "1 6 4 2 3 5 (7 не выводится)",
+      "1 6 4 2 7 3 5"
+    ],
+    "answers": [
+      "1 6 4 7 2 3 5",
+      "1 6 4 2 3 7 5",
+      "1 6 4 2 3 5 7",
+      "1 6 4 2 3 5 (7 не выводится)"
+    ],
+    "comment": "Синхронно выводятся 1 и 6, затем микрозадача выводит 4 и регистрирует второй таймер. Первый таймер выводит 2, после него микрозадача выводит 3, а второй таймер выводит 5. Колбэк requestAnimationFrame может выполниться до первого таймера, между таймерами или после них; в фоновой вкладке отрисовка может быть приостановлена."
+  },
+  {
+    "id": "w10-async-23",
+    "code": "console.log('1. Синхронный код: Старт');\n\nsetTimeout(() => {\n    console.log('4. Макротаск: setTimeout (из очереди макротасков)');\n}, 0);\n\nqueueMicrotask(() => {\n    console.log('3. Микротаск: queueMicrotask (из очереди микротасков)');\n});\n\nconsole.log('2. Синхронный код: Конец');",
+    "type": "single",
+    "options": [
+      "1 2 3 4",
+      "1 2 4 3",
+      "1 3 2 4",
+      "1 4 3 2"
+    ],
+    "answers": ["1 2 3 4"],
+    "comment": "Сначала синхронный код выводит сообщения 1 и 2. Затем выполняется микрозадача queueMicrotask и выводит 3, после чего таймер выводит 4."
+  },
+  {
+    "id": "w10-async-24",
+    "code": "Promise\n  .reject(\"a\")\n  .catch((p) => p + \"b\")\n  .catch((p) => p + \"с\")\n  .then((p) => p + \"d\")\n  .finally((p) => console.log(p + \"e\")) //\n  .then((p) => console.log(p)); //",
+    "type": "single",
+    "options": [
+      "undefinede abd",
+      "abde abd",
+      "undefined abd",
+      "abсde abсd"
+    ],
+    "answers": ["undefinede abd"],
+    "comment": "Первый catch восстанавливает промис со значением ab, поэтому второй catch пропускается. Затем then добавляет d. Обработчик finally не получает значение промиса: p равно undefined, и выводится undefinede. После finally значение abd сохраняется и выводится следующим then."
+  },
+  {
+    "id": "w10-async-25",
+    "code": "const promise = new Promise((resolve, reject) => {\n  reject(new Error(\"MyError\"));\n});\n\npromise\n  .then((data) => console.log(\"I am data from promise\"))\n  .catch((err) => console.log(err.message));\n\nnew Promise((resolve, reject) => {\n  throw new Error(\"error\");\n})\n  .finally(() => console.log(\"finaly 1\"))\n  .catch(() => console.log(\"catch\"))\n  .finally(() => console.log(\"finaly 2\"))\n  .then(() => console.log(\"then\"));",
+    "type": "single",
+    "options": [
+      "finaly 1 MyError catch finaly 2 then",
+      "MyError finaly 1 catch finaly 2 then",
+      "finaly 1 catch MyError finaly 2 then",
+      "finaly 1 MyError catch then finaly 2"
+    ],
+    "answers": ["finaly 1 MyError catch finaly 2 then"],
+    "comment": "Первый then пропускается из-за отклонения промиса, а исключение в экзекуторе второго промиса тоже приводит к отклонению. Обработчик finally второй цепочки уже находится в очереди микрозадач, когда отклонение первого промиса передаётся к catch, поэтому finaly 1 выводится раньше MyError. Затем catch второй цепочки обрабатывает ошибку, после чего выполняются finaly 2 и then."
+  }
+]
